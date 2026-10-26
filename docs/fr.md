@@ -52,9 +52,9 @@ Intégration non officielle, sans lien avec Ubiquiti.
 - **Rafraîchissement** : 30 s, 1 min (par défaut), 2 ou 5 min. Le bouton de
   test, l'enregistrement du formulaire et un redémarrage de Gladys ou du
   conteneur ne lisent pas plus tôt (l'heure du dernier essai est gardée,
-  écrite avant chaque lecture, au plus une fois par minute : un conteneur
-  tué sans arrêt propre peut relire jusqu'à 30 s plus tôt au rafraîchissement
-  de 30 s). Un appui sur **Redémarrer la radio** fait sa propre lecture
+  écrite avant chaque lecture, au plus une fois par minute à partir du
+  rafraîchissement de 1 min : à 30 s elle est écrite avant chaque lecture, donc
+  un redémarrage ne lit jamais plus tôt). Un appui sur **Redémarrer la radio** fait sa propre lecture
   fraîche (avec une connexion si besoin), hors rafraîchissement.
 - **Autoriser le redémarrage de la radio** : désactivé par défaut.
 

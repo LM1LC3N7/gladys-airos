@@ -47,8 +47,8 @@ Unofficial integration, not affiliated with Ubiquiti.
 - **Refresh**: 30 s, 1 min (default), 2 or 5 min. The test button, a save of
   the form and a restart of Gladys or of the container do not read sooner
   (the time of the last attempt is kept, written before each reading, at most
-  once a minute: a container killed without a clean stop may read up to 30 s
-  sooner at the 30 s refresh). A press on **Reboot the radio** makes one
+  once a minute from the 1 min refresh up: at the 30 s refresh it is written
+  before every reading, so a restart never reads sooner). A press on **Reboot the radio** makes one
   fresh read of its own (a login if needed), outside the refresh.
 - **Allow rebooting the radio**: off by default.
 

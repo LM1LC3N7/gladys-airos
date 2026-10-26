@@ -107,7 +107,8 @@ up to date at the end of every milestone.
   it. A status refused (401/403) right after a fresh login is "access
   refused", retried like any failure, never a refusal of the credentials.
 - **Pace**: one timer; `dueAt(mono)` on the caller's instant; the time of the
-  last attempt written to /data before the request (at most once a minute);
+  last attempt written to /data before the request (at most once a minute from a 1 min
+  interval up, before every reading at 30 s);
   failures retried from max(1 min, interval) doubling to 30 min; 429/5xx a
   pause of 1 min (or the interval) to 6 h, Retry-After honoured, kept in /data.
 - **Units** (core list only): kbit/s for rates and capacities, Mbit/s for the

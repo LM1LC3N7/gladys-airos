@@ -486,11 +486,14 @@ test('the marker of a refused password: 8 bits, shared by many passwords (no bru
   const salt = 'ab'.repeat(32);
   const target = refusalTag(salt, 'Ferme-2024!');
   assert.match(target, /^[0-9a-f]{2}$/);
+  // Fixed candidates: the count is the same on every run (about 1/256 expected).
+  const total = 100_000;
   let same = 0;
-  for (let i = 0; i < 10_000; i += 1) {
-    if (refusalTag(salt, `candidate-${i}-${Math.random()}`) === target) same += 1;
+  for (let i = 0; i < total; i += 1) {
+    if (refusalTag(salt, `candidate-${i}`) === target) same += 1;
   }
-  assert.ok(same >= 10_000 / 300, `${same} of 10 000 share it`);
+  assert.ok(same >= total / 400, `${same} of ${total} share it`);
+  assert.ok(same <= total / 150, `${same} of ${total} share it`);
 });
 
 test('reboot: an identity not checked yet is said so, never "another radio"', async () => {
