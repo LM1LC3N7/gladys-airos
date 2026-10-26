@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-26
+
 ### Added
 
 - First version: Ubiquiti airMAX radios on airOS 8 through the JSON API of
@@ -27,3 +29,6 @@ the notes of the version's GitHub Release.
   fingerprint lifts a kept "certificate changed"; the reboot is refused
   when its cooldown cannot be written to /data; the refused-password marker
   is 8 bits.
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-airos/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-airos/releases/tag/v0.1.1
