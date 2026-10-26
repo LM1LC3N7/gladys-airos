@@ -16,7 +16,11 @@ garden office or a neighbour:
 - two scene triggers: **Wireless link lost** and **Wireless link back**.
 
 On an access point with several stations (PtMP), the signals are those of
-the weakest station.
+the weakest station. With no station connected, the signals (and on some
+radios the capacities) are not read: Gladys keeps their last value, with its
+date. Prefer reading the radio on the Gladys side of the link: when the
+radio read is the one that becomes unreachable, "link lost" cannot fire (the
+radio itself is then shown unreachable).
 
 > **This integration has never been tested with a real radio.** This first
 > version was ported from python-airos, the library Home Assistant uses, and
@@ -40,9 +44,12 @@ Unofficial integration, not affiliated with Ubiquiti.
   its interface is not on 443. Plain HTTP is refused (airOS 8 serves HTTPS).
 - **User name**, **Password**.
 - **Certificate fingerprint** (optional): see below.
-- **Refresh**: 30 s, 1 min (default), 2 or 5 min. Never sooner, whatever asks
-  (the test button, a save of the form, a restart of Gladys or of the
-  container: the time of the last attempt is kept).
+- **Refresh**: 30 s, 1 min (default), 2 or 5 min. The test button, a save of
+  the form and a restart of Gladys or of the container do not read sooner
+  (the time of the last attempt is kept, written before each reading, at most
+  once a minute: a container killed without a clean stop may read up to 30 s
+  sooner at the 30 s refresh). A press on **Reboot the radio** makes one
+  fresh read of its own (a login if needed), outside the refresh.
 - **Allow rebooting the radio**: off by default.
 
 ## The HTTPS certificate
@@ -57,10 +64,11 @@ and **before** sending the password:
   fingerprint (the status shows the one met);
 - afterwards, another certificate stops everything (nothing is sent) and
   the status shows its fingerprint. Saving the form again changes nothing.
-  If you replaced or reset the radio, check that fingerprint in your
-  browser (padlock, certificate, SHA-256) and type it in **Certificate
-  fingerprint**: it becomes the trusted one. Emptying the field later does
-  not learn a certificate again.
+  If you replaced or reset the radio, type in **Certificate fingerprint**
+  the fingerprint your browser shows for the radio (padlock, certificate,
+  SHA-256): it becomes the trusted one. If the radio then presents another
+  one, nothing is sent and the status shows the one it presents. Emptying
+  the field later does not learn a certificate again.
 
 ## The reboot
 
@@ -72,9 +80,14 @@ refused, nothing sent, in these cases:
   request is written);
 - the radio is not connected, Gladys is in a pause asked by the radio
   (HTTP 429 or 5xx), the login or the certificate was refused;
-- a reboot was sent less than 10 minutes ago (kept across restarts);
+- a reboot was sent less than 10 minutes ago (kept across restarts), or
+  this delay cannot be written to the storage of the integration (/data);
+- a reboot is already being sent;
+- after a restart of the integration, until its first reading (one refresh
+  interval at most), or the configuration was saved during the press;
 - the radio does not answer the read made just before within 2.5 s, or
-  another radio answers (another MAC), or its MAC cannot be read;
+  another radio answers (another MAC), or its MAC cannot be read or was not
+  read yet;
 - the request could not be written within 3.5 s of the press.
 
 When the request was written but the radio did not answer, Gladys says "sent,
@@ -84,16 +97,21 @@ minutes; the status then says the radio is rebooting.
 ## Failures
 
 - **Credentials refused**: nothing is sent again until the user name or the
-  password changes; the **Test the connection** button tries once more.
+  password changes; the **Test the connection** button tries once more. Gladys
+  keeps an 8-bit marker of the refused password (shared by 1 password in
+  256, never the password): a new password sharing it is taken as refused
+  until the test button tries it.
 - **HTTP 429 or 5xx**: a pause of every request (1 min to 6 h), kept across
   restarts.
-- **No answer**: tried again after the refresh interval, then 2, 4… up to
-  30 minutes.
+- **No answer**: tried again after 1 minute or the refresh interval if
+  longer, then twice as long each time, up to 30 minutes.
 - **Another radio** at the address (another MAC): nothing is published; save
   the form to take it as the new one.
 
 Neither the password, nor the session, nor the MAC addresses or IP addresses
-of the stations are logged, published or stored.
+of the stations are logged or published. The storage keeps the certificate
+fingerprint, the 8-bit marker above, and a salted hash of the MAC of the radio
+(not the MAC in clear; a MAC is not a secret, the radio broadcasts it).
 
 ## Not done (yet)
 

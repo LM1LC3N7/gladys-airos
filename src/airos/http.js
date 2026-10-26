@@ -59,6 +59,7 @@ export function httpsRequest(
   return new Promise((resolve, reject) => {
     let settled = false;
     let sent = false;
+    let early = false;
     let req = null;
 
     const finish = (error, value) => {
@@ -92,6 +93,7 @@ export function httpsRequest(
         }
         await checkPeer(fingerprint);
         if (settled) return;
+        if (early) throw new RadioError(CODES.BAD_ANSWER, 'Answer before the request');
         beforeSend?.();
       } catch (err) {
         finish(Object.assign(err, { notSent: true }));
@@ -120,6 +122,15 @@ export function httpsRequest(
       };
       if (!isIP(bare)) options.servername = bare;
       req = https.request(options, (res) => {
+        // An answer before the request was written (the peer spoke first,
+        // while its certificate was still being checked): never accepted.
+        // The verdict of checkPeer still decides the error (a refused
+        // certificate stays a refused certificate); see ready().
+        if (!sent) {
+          early = true;
+          res.resume();
+          return;
+        }
         const chunks = [];
         let size = 0;
         res.on('data', (chunk) => {

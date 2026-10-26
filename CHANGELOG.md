@@ -23,3 +23,7 @@ the notes of the version's GitHub Release.
 - A Reboot button, off by default, never a switch: fresh read of the same
   radio, the option checked again right before sending, 10 min cooldown.
 - Scene triggers: wireless link lost, wireless link back.
+- HTTPS: an answer sent before the request is refused; a typed
+  fingerprint lifts a kept "certificate changed"; the reboot is refused
+  when its cooldown cannot be written to /data; the refused-password marker
+  is 8 bits.

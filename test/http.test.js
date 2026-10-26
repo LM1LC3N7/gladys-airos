@@ -8,6 +8,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:https';
+import { createServer as createTlsServer } from 'node:tls';
+import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
+import { AirosApp } from '../src/app.js';
 import { CODES } from '../src/airos/errors.js';
 import { httpsRequest } from '../src/airos/http.js';
 import { selfSigned } from './helpers/selfSigned.js';
@@ -151,4 +154,92 @@ test('size cap, deadline, redirect not followed, unreachable without the address
   }).catch((e) => e);
   assert.equal(down.code, CODES.UNREACHABLE);
   assert.doesNotMatch(down.message, /127\.0\.0\.1/);
+});
+
+/** An impostor: a TLS server that answers a forged HTTP response as soon as the handshake ends. */
+async function earlySpeaker() {
+  const forged = JSON.stringify({ host: { devmodel: 'FORGED' }, wireless: { count: 7 } });
+  let received = 0;
+  const srv = createTlsServer({ key: CERT.key, cert: CERT.cert }, (socket) => {
+    socket.on('data', (d) => (received += d.length));
+    socket.on('error', () => {});
+    socket.write(
+      'HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n' +
+        'set-cookie: AIROS_X=forged\r\nx-csrf-id: forged\r\n' +
+        `content-length: ${forged.length}\r\nconnection: close\r\n\r\n${forged}`,
+    );
+  });
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  return {
+    port: srv.address().port,
+    get received() {
+      return received;
+    },
+    close: () => new Promise((resolve) => srv.close(resolve)),
+  };
+}
+
+test('an answer sent before the request is never accepted, even while checkPeer is still deciding', async () => {
+  const s = await earlySpeaker();
+  try {
+    const options = { timeout: 3000, maxBytes: 10_000 };
+    const refused = await httpsRequest(target(s.port, '/api/auth', 'POST'), {
+      ...options,
+      body: '{"password":"secret"}',
+      checkPeer: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        throw Object.assign(new Error('pin'), { code: CODES.PIN_UNAVAILABLE });
+      },
+    }).catch((e) => e);
+    assert.ok([CODES.BAD_ANSWER, CODES.PIN_UNAVAILABLE].includes(refused.code), refused.code);
+    assert.equal(refused.notSent, true);
+    const accepted = await httpsRequest(target(s.port), {
+      ...options,
+      checkPeer: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      },
+    }).catch((e) => e);
+    assert.equal(accepted.code, CODES.BAD_ANSWER);
+    assert.equal(accepted.notSent, true);
+    assert.equal(s.received, 0, 'not a byte of a request');
+  } finally {
+    await s.close();
+  }
+});
+
+test('first contact, /data not writable, an impostor speaking first: nothing published, nothing sent', async () => {
+  const s = await earlySpeaker();
+  const gladys = createFakeGladys({ selector: 'airos', config: {} });
+  await gladys.connect();
+  const quiet = () => {};
+  const app = new AirosApp({
+    gladys,
+    logger: { info: quiet, warn: quiet, error: quiet, debug: quiet },
+    // A real disk refuses after a while: the answer of the impostor comes first.
+    store: {
+      load: async () => null,
+      save: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        throw Object.assign(new Error('EACCES'), { code: 'EACCES' });
+      },
+    },
+  });
+  try {
+    await app.start({ host: `127.0.0.1:${s.port}`, password: 'secret' });
+    for (
+      let i = 0;
+      i < 300 && !/cannot be kept/.test(gladys.fake.connectionStatus?.message?.en);
+      i += 1
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    await app.idle();
+    await app.stop();
+  } finally {
+    await s.close();
+  }
+  assert.equal(gladys.fake.connectionStatus.connected, false);
+  assert.match(gladys.fake.connectionStatus.message.en, /cannot be kept/);
+  assert.equal(gladys.fake.states.length, 0);
+  assert.equal(s.received, 0);
 });

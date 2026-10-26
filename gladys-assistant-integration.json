@@ -79,8 +79,8 @@
       "type": "select",
       "label": { "en": "Refresh", "fr": "Rafraîchissement" },
       "description": {
-        "en": "How often the radio is read. Never sooner, whatever asks (a restart included).",
-        "fr": "Fréquence de lecture de la radio. Jamais plus souvent, quoi qui le demande (redémarrage compris)."
+        "en": "How often the radio is read. The test button, a save of the form or a restart do not read sooner; a press on Reboot makes one fresh read of its own.",
+        "fr": "Fréquence de lecture de la radio. Le bouton de test, l'enregistrement du formulaire ou un redémarrage ne lisent pas plus tôt ; un appui sur Redémarrer fait sa propre lecture fraîche."
       },
       "required": true,
       "default": "60",

@@ -205,11 +205,12 @@ export const T = {
     stillRunning: 'A reboot is already being sent',
     notConnected: 'The radio is not connected',
     otherRadio: 'Another radio answers at this address: nothing sent',
-    identityUnknown: 'The identity of the radio could not be read: nothing sent',
+    identityUnknown: 'The identity of the radio (its MAC) is not checked yet: nothing sent',
     paused: (delay) => `The radio asked to wait: nothing sent for ${delayOf(delay).en}`,
     cooldown: (delay) =>
       `A reboot was sent less than 10 min ago: nothing sent, try again in ${delayOf(delay).en}`,
     tooSlow: 'The radio did not answer in time: nothing sent',
+    cooldownNotKept: 'The 10 min delay between two reboots cannot be kept in /data: nothing sent',
     unknownState: (reason) => `The radio could not be read just before (${reason}): nothing sent`,
     notSent: (reason) => `Reboot not sent (${reason})`,
     refused: (reason) => `The radio refused the reboot (${reason})`,

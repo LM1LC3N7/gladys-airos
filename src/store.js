@@ -8,11 +8,13 @@
 //     (its fingerprint, shown in the status): nothing is sent there until the
 //     user types that fingerprint in the configuration;
 //   - `refused`: `{ key, user, tag }`, the login the radio refused: `tag` is
-//     16 bits of an HMAC of the refused password (never the password, never
-//     a hash of the accepted one), so that a restart does not try it again;
+//     8 bits of an HMAC of the refused password (a marker: 1 password in 256
+//     shares it; never the password, never a hash of the accepted one), so
+//     that a restart does not try it again;
 //   - `pause`: `{ key, until, status }`, the end of a pause after HTTP 429/5xx;
-//   - `identity`: `{ key, tag }`, an HMAC of the MAC of the radio read there
-//     (never the MAC itself);
+//   - `identity`: `{ key, tag }`, a salted HMAC of the MAC of the radio read
+//     there (not the MAC in clear; it can be found again by brute force, and
+//     a MAC is not a secret: the radio broadcasts it);
 //   - `rebootAt`: `{ key, at }`, when a reboot was last sent (cooldown);
 //   - `lastAttemptAt`: the wall-clock time of the last reading started, so
 //     that a restart never reads sooner than the interval.
@@ -142,7 +144,7 @@ export function normalizeMemory(raw, now, random = randomBytes) {
     }),
     refused: keyed(own(raw, 'refused'), {
       user: (v) => typeof v === 'string' && v.length <= 64,
-      tag: (v) => typeof v === 'string' && HEX(4).test(v),
+      tag: (v) => typeof v === 'string' && HEX(2).test(v),
     }),
     // A pause over is dropped; one ending beyond its cap (a clock set back) is capped.
     pause:

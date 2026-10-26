@@ -55,11 +55,14 @@ test/                    node --test, fake Gladys (SDK) + fake radio + loopback 
 - **The certificate** is checked before any byte is written; a first pin is
   written to /data before the password goes; /data unreadable or not
   writable never learns one; another certificate is lifted only by typing
-  its fingerprint. Never turn the check off.
+  a fingerprint (which the radio must then present). An answer arriving
+  before the request is written is never accepted. Never turn the check off.
 - **Secrets and identifiers**: the password, the session cookie, the CSRF
   id, the MACs, the IP addresses of the stations, the ESSID and the device id
   are never in a log, an error message, a status, a state, a scene event or
-  /data (`test/app.test.js` checks it).
+  /data in clear (`test/app.test.js` checks it). /data keeps an 8-bit marker
+  of a refused password and a salted HMAC of the MAC of the radio (a MAC is
+  not a secret; the HMAC can be brute-forced).
 - **Clocks**: one read of the monotonic clock per decision (`dueAt(mono)`);
   the tests use a clock that moves at every read, and `test/realclock.test.js`
   runs on the real clock.

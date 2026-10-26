@@ -192,7 +192,7 @@ test('credentials refused: kept in /data, never retried by the loop nor a restar
     /refused the user name or the password/,
   );
   assert.equal(store.data.refused.key, KEY);
-  assert.equal(store.data.refused.tag.length, 4, '16 bits, never a hash of the password');
+  assert.equal(store.data.refused.tag.length, 2, '8 bits, never a hash of the password');
   await ctx.wait(2 * 60 * MINUTE);
   assert.equal(sentTo(radio, '/api/auth').length, 1);
   await ctx.gladys.fake.configUpdated({ ...BASE_CONFIG });
@@ -431,4 +431,73 @@ test('a station (PtP): its signal, its temperature', async () => {
   assert.equal(state(ctx.gladys, FEATURES.SIGNAL), -58);
   assert.equal(state(ctx.gladys, FEATURES.TEMPERATURE), 41);
   assert.equal(state(ctx.gladys, FEATURES.WIRELESS_MODE), 'Station PtP');
+});
+
+test('a fingerprint typed lifts a kept "certificate changed", whatever it saw; the radio must show it', async () => {
+  // Pinned on B (FINGERPRINT); C (OTHER) met once; the radio back on B.
+  const seed = () =>
+    memoryStore({
+      salt: '07'.repeat(32),
+      pins: { [KEY]: FINGERPRINT },
+      certChanged: { key: KEY, seen: OTHER_FINGERPRINT },
+    });
+  const onB = createFakeRadio();
+  const a = await setup({
+    radio: onB,
+    store: seed(),
+    config: { certificate_fingerprint: FINGERPRINT },
+  });
+  assert.equal(a.gladys.fake.connectionStatus.connected, true);
+  assert.equal(a.store.data.certChanged, null);
+  // The radio on C while B is typed: refused, the status shows C, no login.
+  const onC = createFakeRadio({ fingerprint: OTHER_FINGERPRINT });
+  const b = await setup({
+    radio: onC,
+    store: seed(),
+    config: { certificate_fingerprint: FINGERPRINT },
+  });
+  assert.equal(b.gladys.fake.connectionStatus.connected, false);
+  assert.match(b.gladys.fake.connectionStatus.message.en, /not the fingerprint you typed/);
+  assert.match(b.gladys.fake.connectionStatus.message.en, new RegExp(OTHER_FINGERPRINT));
+  assert.equal(sentTo(onC, '/api/auth').length, 0);
+  // The field empty: still nothing lifted.
+  const c = await setup({ radio: createFakeRadio(), store: seed() });
+  assert.match(c.gladys.fake.connectionStatus.message.en, new RegExp(OTHER_FINGERPRINT));
+  assert.equal(c.radio.connections, 0);
+});
+
+for (const options of [{ failing: true }, { unreadable: true }]) {
+  test(`reboot refused when its 10 min delay cannot be kept in /data (${Object.keys(options)[0]})`, async () => {
+    const store = memoryStore(null, options);
+    const ctx = await setup({
+      store,
+      config: { allow_reboot: true, certificate_fingerprint: FINGERPRINT },
+    });
+    assert.equal(ctx.gladys.fake.connectionStatus.connected, true);
+    const ack = await press(ctx.gladys);
+    assert.equal(ack.success, false);
+    assert.match(ack.error, /cannot be kept in \/data/);
+    assert.equal(sentTo(ctx.radio, '/reboot.cgi').length, 0);
+  });
+}
+
+test('the marker of a refused password: 8 bits, shared by many passwords (no brute force)', async () => {
+  const { refusalTag } = await import('../src/app.js');
+  const salt = 'ab'.repeat(32);
+  const target = refusalTag(salt, 'Ferme-2024!');
+  assert.match(target, /^[0-9a-f]{2}$/);
+  let same = 0;
+  for (let i = 0; i < 10_000; i += 1) {
+    if (refusalTag(salt, `candidate-${i}-${Math.random()}`) === target) same += 1;
+  }
+  assert.ok(same >= 10_000 / 300, `${same} of 10 000 share it`);
+});
+
+test('reboot: an identity not checked yet is said so, never "another radio"', async () => {
+  const radio = createFakeRadio({ answer: () => status({ interfaces: [] }) });
+  const ctx = await setup({ radio, config: { allow_reboot: true } });
+  radio.answer = () => status();
+  const ack = await press(ctx.gladys);
+  assert.match(ack.error, /not checked yet/);
+  assert.equal(sentTo(radio, '/reboot.cgi').length, 0);
 });

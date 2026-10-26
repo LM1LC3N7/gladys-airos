@@ -3,28 +3,34 @@
 // real local HTTPS server playing the radio (self-signed certificate, pinned
 // at the first contact): the readings really start, at 0, the interval and
 // twice the interval, with a bounded number of timers. The time is sped up
-// 100 times (30 s of the interval are 300 ms) but it is the real clock: it
-// moves between any two reads of it.
+// 50 times (30 s of the interval are 600 ms) but it is the real clock: it
+// moves between any two reads of it. The pace is measured where it is
+// decided (a spy on AirosClient#status, the start of a reading), never on
+// the connections the server sees (a login, a cold TLS start shift them).
 // -----------------------------------------------------------------------------
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:https';
 import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
+import { AirosClient } from '../src/airos/client.js';
 import { AirosApp } from '../src/app.js';
 import { memoryStore } from '../src/store.js';
 import { COOKIE, CSRF, PASSWORD, USERNAME, status } from './fixtures/airos.js';
 import { selfSigned } from './helpers/selfSigned.js';
 
-const SPEED = 100;
+const SPEED = 50;
 const INTERVAL = 30_000;
 
 test('real clock: readings at 0, the interval and twice the interval; timers bounded', async () => {
   const cert = selfSigned('UBNT');
-  // A reading starts with its first TCP connection (the login, if any, then
-  // the status): the pace counts from the start of an attempt.
   const reads = [];
   let answered = 0;
+  const original = AirosClient.prototype.status;
+  AirosClient.prototype.status = function spy(...args) {
+    reads.push(performance.now() * SPEED);
+    return original.apply(this, args);
+  };
   const server = createServer({ key: cert.key, cert: cert.cert }, (req, res) => {
     let body = '';
     req.on('data', (c) => (body += c));
@@ -47,10 +53,6 @@ test('real clock: readings at 0, the interval and twice the interval; timers bou
       }
       res.writeHead(404).end();
     });
-  });
-  server.on('connection', () => {
-    const at = performance.now() * SPEED;
-    if (reads.length === 0 || at - reads.at(-1) > INTERVAL / 2) reads.push(at);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address();
@@ -92,6 +94,7 @@ test('real clock: readings at 0, the interval and twice the interval; timers bou
     }
     await app.stop();
   } finally {
+    AirosClient.prototype.status = original;
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));
   }
@@ -100,8 +103,8 @@ test('real clock: readings at 0, the interval and twice the interval; timers bou
   assert.ok(reads[0] - started < INTERVAL / 2, `the first read at once: ${at}`);
   for (let i = 1; i < reads.length; i += 1) {
     const gap = reads[i] - reads[i - 1];
-    assert.ok(gap >= 0.9 * INTERVAL, `never sooner than the interval: ${at}`);
-    assert.ok(gap < 1.5 * INTERVAL, `on time: ${at}`);
+    assert.ok(gap >= 0.98 * INTERVAL, `never sooner than the interval: ${at}`);
+    assert.ok(gap <= 1.3 * INTERVAL, `on time: ${at}`);
   }
   assert.ok(timersSet <= 12, `${timersSet} timers`);
   assert.equal(gladys.fake.connectionStatus.connected, true);

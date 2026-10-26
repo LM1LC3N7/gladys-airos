@@ -18,7 +18,11 @@ vers une grange, un bureau au fond du jardin ou un voisin :
   revenu**.
 
 Sur un point d'accès avec plusieurs stations (PtMP), les signaux sont ceux
-de la station la plus faible.
+de la station la plus faible. Sans station connectée, les signaux (et sur
+certaines radios les capacités) ne sont pas lus : Gladys garde leur dernière
+valeur, avec sa date. Lisez de préférence la radio du côté de Gladys : si la
+radio lue est celle qui devient injoignable, « lien perdu » ne peut pas se
+déclencher (la radio est alors affichée injoignable).
 
 > **Cette intégration n'a jamais été testée avec une vraie radio.** Cette
 > première version a été portée depuis python-airos, la bibliothèque
@@ -45,10 +49,13 @@ Intégration non officielle, sans lien avec Ubiquiti.
   sert du HTTPS).
 - **Nom d'utilisateur**, **Mot de passe**.
 - **Empreinte du certificat** (facultatif) : voir plus bas.
-- **Rafraîchissement** : 30 s, 1 min (par défaut), 2 ou 5 min. Jamais plus
-  souvent, quoi qui le demande (bouton de test, enregistrement du
-  formulaire, redémarrage de Gladys ou du conteneur : l'heure du dernier
-  essai est gardée).
+- **Rafraîchissement** : 30 s, 1 min (par défaut), 2 ou 5 min. Le bouton de
+  test, l'enregistrement du formulaire et un redémarrage de Gladys ou du
+  conteneur ne lisent pas plus tôt (l'heure du dernier essai est gardée,
+  écrite avant chaque lecture, au plus une fois par minute : un conteneur
+  tué sans arrêt propre peut relire jusqu'à 30 s plus tôt au rafraîchissement
+  de 30 s). Un appui sur **Redémarrer la radio** fait sa propre lecture
+  fraîche (avec une connexion si besoin), hors rafraîchissement.
 - **Autoriser le redémarrage de la radio** : désactivé par défaut.
 
 ## Le certificat HTTPS
@@ -63,10 +70,12 @@ Gladys le vérifie par son empreinte SHA-256, juste après la négociation TLS e
   l'empreinte (l'état affiche celle rencontrée) ;
 - ensuite, un autre certificat arrête tout (rien n'est envoyé) et l'état
   affiche son empreinte. Réenregistrer le formulaire ne change rien. Si vous
-  avez remplacé ou réinitialisé la radio, vérifiez cette empreinte dans
-  votre navigateur (cadenas, certificat, SHA-256) et saisissez-la dans
-  **Empreinte du certificat** : elle devient celle de confiance. Vider le
-  champ plus tard ne fait pas réapprendre de certificat.
+  avez remplacé ou réinitialisé la radio, saisissez dans **Empreinte du
+  certificat** l'empreinte que montre votre navigateur pour la radio
+  (cadenas, certificat, SHA-256) : elle devient celle de confiance. Si la
+  radio en présente alors une autre, rien n'est envoyé et l'état affiche
+  celle qu'elle présente. Vider le champ plus tard ne fait pas réapprendre
+  de certificat.
 
 ## Le redémarrage
 
@@ -79,9 +88,15 @@ appui est refusé, rien n'est envoyé, dans ces cas :
 - la radio n'est pas connectée, Gladys est dans une pause demandée par la
   radio (HTTP 429 ou 5xx), l'identifiant ou le certificat a été refusé ;
 - un redémarrage a été envoyé il y a moins de 10 minutes (gardé au
-  redémarrage) ;
+  redémarrage), ou ce délai ne peut pas être écrit dans le stockage de
+  l'intégration (/data) ;
+- un redémarrage est déjà en cours d'envoi ;
+- après un redémarrage de l'intégration, jusqu'à sa première lecture (au
+  plus un intervalle de rafraîchissement), ou la configuration a été
+  enregistrée pendant l'appui ;
 - la radio ne répond pas à la lecture faite juste avant en 2,5 s, ou une
-  autre radio répond (autre MAC), ou sa MAC est illisible ;
+  autre radio répond (autre MAC), ou sa MAC est illisible ou pas encore
+  lue ;
 - la requête n'a pas pu être écrite dans les 3,5 s qui suivent l'appui.
 
 Quand la requête a été écrite mais que la radio n'a pas répondu, Gladys dit
@@ -92,16 +107,22 @@ minutes ; l'état dit alors que la radio redémarre.
 
 - **Identifiants refusés** : plus rien n'est envoyé tant que le nom
   d'utilisateur ou le mot de passe ne change pas ; le bouton **Tester la
-  connexion** essaie une fois de plus.
+  connexion** essaie une fois de plus. Gladys garde un marqueur de 8 bits du
+  mot de passe refusé (commun à 1 mot de passe sur 256, jamais le mot de
+  passe) : un nouveau mot de passe qui le partage est tenu pour refusé
+  jusqu'à ce que le bouton de test l'essaie.
 - **HTTP 429 ou 5xx** : une pause de toutes les requêtes (1 min à 6 h),
   gardée au redémarrage.
-- **Pas de réponse** : nouvel essai après l'intervalle de rafraîchissement,
-  puis 2, 4… jusqu'à 30 minutes.
+- **Pas de réponse** : nouvel essai après 1 minute, ou l'intervalle de
+  rafraîchissement s'il est plus long, puis deux fois plus long à chaque
+  fois, jusqu'à 30 minutes.
 - **Une autre radio** à l'adresse (autre MAC) : rien n'est publié ;
   enregistrez le formulaire pour la prendre comme la nouvelle.
 
 Ni le mot de passe, ni la session, ni les adresses MAC ou IP des stations ne
-sont journalisés, publiés ou stockés.
+sont journalisés ou publiés. Le stockage garde l'empreinte du certificat, le
+marqueur de 8 bits ci-dessus et une empreinte salée de la MAC de la radio
+(pas la MAC en clair ; une MAC n'est pas un secret, la radio la diffuse).
 
 ## Pas (encore) fait
 

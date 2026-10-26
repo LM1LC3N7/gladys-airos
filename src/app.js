@@ -55,6 +55,12 @@ const TEST_BUDGET_MS = 25_000;
 const defaultTimers = { setTimeout, clearTimeout };
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const hmac = (salt, value) => createHmac('sha256', salt).update(value).digest('hex');
+/**
+ * 8 bits of an HMAC of a refused password: a marker, never enough to tell a
+ * password (1 password in 256 shares it). A new password sharing it is taken
+ * as refused until the test button tries it (a success clears the refusal).
+ */
+export const refusalTag = (salt, password) => hmac(salt, `refused|${password}`).slice(0, 2);
 
 /** An error for Gladys, with its cause kept (never shown). */
 const userError = (message, cause) =>
@@ -415,13 +421,14 @@ export class AirosApp {
       }
     }
     if (m.certChanged?.key === key) {
-      if (config.fingerprint === m.certChanged.seen) {
-        // The user typed the very fingerprint met: it becomes the pin.
-        m.pins[key] = m.certChanged.seen;
+      if (config.fingerprint) {
+        // A fingerprint typed is the authority: checkPeer imposes it (another
+        // certificate is refused, showing the one really met, nothing sent).
+        // It is pinned once a handshake shows it.
         m.certChanged = null;
         dirty = true;
         if (this.final?.code === CODES.CERTIFICATE) this.final = null;
-        this.logger.info('The HTTPS certificate typed in the configuration is now pinned');
+        this.logger.info('A certificate fingerprint was typed: it is the one trusted now');
       } else {
         this.final = {
           code: CODES.CERTIFICATE,
@@ -439,7 +446,7 @@ export class AirosApp {
       r &&
       r.key === targetKey(c) &&
       r.user === c.username &&
-      r.tag === hmac(this.memory.salt, c.password).slice(0, 4),
+      r.tag === refusalTag(this.memory.salt, c.password),
     );
   }
 
@@ -576,7 +583,7 @@ export class AirosApp {
     if (
       this.savedAttemptAt === undefined ||
       now < this.savedAttemptAt ||
-      now - this.savedAttemptAt >= INTERVALS.ATTEMPT_SAVE_MS
+      now - this.savedAttemptAt >= Math.min(INTERVALS.ATTEMPT_SAVE_MS, this.config.pollMs)
     ) {
       this.savedAttemptAt = now;
       await this.save();
@@ -599,7 +606,7 @@ export class AirosApp {
         m.refused = {
           key,
           user: this.config.username,
-          tag: hmac(m.salt, this.config.password).slice(0, 4),
+          tag: refusalTag(m.salt, this.config.password),
         };
         this.final = { code: CODES.CREDENTIALS, message: T.status.credentialsRefused };
         this.session?.client?.close();
@@ -957,9 +964,8 @@ export class AirosApp {
     if (readLeft() < 0) throw userError(T.errors.tooSlow);
     const tag = this.identityTag(fresh);
     if (!tag) throw userError(T.errors.identityUnknown);
-    if (!this.identityChecked || this.memory.identity?.tag !== tag) {
-      throw userError(T.errors.otherRadio);
-    }
+    if (!this.identityChecked) throw userError(T.errors.identityUnknown);
+    if (this.memory.identity?.tag !== tag) throw userError(T.errors.otherRadio);
     // The option may have been turned off during the read: checked again.
     const sendBy = received + COMMAND.SEND_BY_MS;
     let mono = this.monotonic();
@@ -969,12 +975,18 @@ export class AirosApp {
     const before = { at: this.memory.rebootAt, mono: this.rebootMono };
     this.memory.rebootAt = { key: this.key(), at: this.now() };
     this.rebootMono = mono;
-    await this.save();
     const undo = () => {
       this.memory.rebootAt = before.at;
       this.rebootMono = before.mono;
       return this.save();
     };
+    // The cooldown must survive a restart: /data unreadable or not writable,
+    // nothing is sent.
+    if (!(await this.save())) {
+      this.memory.rebootAt = before.at;
+      this.rebootMono = before.mono;
+      throw userError(T.errors.cooldownNotKept);
+    }
     mono = this.monotonic();
     if (mono > sendBy || session !== this.session) {
       await undo();

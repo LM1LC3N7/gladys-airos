@@ -42,7 +42,13 @@ up to date at the end of every milestone.
     long the radio takes to answer again (5 min assumed for the "rebooting"
     status);
   - the TLS versions and ciphers of older airOS 8 firmware (Node 22 refuses
-    below TLS 1.2: the status says "TLS refused").
+    below TLS 1.2: the status says "TLS refused");
+  - whether `wireless.distance` is 0 on a short or unmeasured link (the
+    loco5ac fixtures give 0 there and 1 m in `sta[]`): then take
+    `sta[0].distance`, or publish nothing at 0;
+  - whether airOS 8 answers 401/403 on `/api/auth` while it boots or after
+    several failures (a lockout): that would change the meaning of the
+    refusal kept in /data.
 - [ ] **Later** (ask on the forum first): one device per station of an access
       point (PtMP), the station kick, the firmware update check (a text),
       airOS 6 (`/login.cgi`, cookie session), discovery by the UDP broadcast
@@ -76,17 +82,27 @@ up to date at the end of every milestone.
   nothing is learned nor sent, the status asks to type the fingerprint met.
   Another certificate later: nothing sent, `certChanged` kept in /data, the
   status shows the fingerprint met; saving the form lifts nothing; typing
-  that fingerprint pins it. A typed fingerprint, once verified, is kept in
+  a fingerprint lifts it (review r1, I2): any valid fingerprint typed is the
+  authority, the radio must present it (else `certificate_typed` shows the
+  one met, nothing sent). A typed fingerprint, once verified, is kept in
   /data: emptying the field never learns blindly. No two-click button (the
-  typed fingerprint is the one path).
+  typed fingerprint is the one path). An answer the radio sends before the
+  request is written is refused, the verdict of the certificate check
+  deciding the error (review r1, I1).
+- **Reboot cooldown in /data or no reboot** (review r1, I3): the 10 min delay
+  is written to /data before the first byte; /data unreadable or not
+  writable, the press is refused, nothing sent.
 - **Identity**: an HMAC (salt of /data) of the MAC of `br0`, `eth0` or `ath0`
   (python-airos's order), per address; another MAC at the address publishes
   nothing and refuses the reboot until the form is saved. A MAC that cannot
   be read is "unknown" (the values are published, the reboot refused), never
   "another radio". The external id is fixed (`radio:main`): a replaced radio
   keeps its device.
-- **Refused login**: 16 bits of an HMAC of the refused password, per address
-  and user, in /data; never a hash of the accepted one. The loop and a
+- **Refused login**: 8 bits of an HMAC of the refused password (a marker
+  shared by 1 password in 256; review r1, I4, with a brute-force test), per
+  address and user, in /data; never a hash of the accepted one. A new
+  password sharing the marker is taken as refused until the test button
+  tries it. The loop and a
   restart never send it again; the test button tries once; a success clears
   it. A status refused (401/403) right after a fresh login is "access
   refused", retried like any failure, never a refusal of the credentials.
