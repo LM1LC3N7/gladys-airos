@@ -1,67 +1,110 @@
-# Template de démonstration
+# Ubiquiti airOS
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Les radios **airMAX** de Ubiquiti (NanoBeam, NanoStation, LiteBeam,
+PowerBeam, Rocket, LiteAP… sous **airOS 8**) dans Gladys, par l'API JSON de
+l'interface web locale de la radio. Pratique pour surveiller un lien sans fil
+vers une grange, un bureau au fond du jardin ou un voisin :
 
-## Ce que vous obtenez
+- la radio devient un appareil Gladys (onglet Découverte) : **lien sans fil
+  établi** (oui / non), **stations connectées**, **signal** et **signal
+  distant** (dBm), **bruit de fond**, **débits émis** et **reçus**,
+  **capacités descendante** et **montante**, **distance du lien**,
+  **fréquence**, **largeur de canal**, **charge CPU**, **mémoire utilisée**,
+  **temps de fonctionnement**, **température** (si la radio a un capteur),
+  **port LAN** connecté et sa vitesse, **mode sans fil**, **firmware** ;
+- un bouton **Redémarrer la radio**, inactif tant que vous ne l'autorisez
+  pas ;
+- deux déclencheurs de scène : **Lien sans fil perdu** et **Lien sans fil
+  revenu**.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+Sur un point d'accès avec plusieurs stations (PtMP), les signaux sont ceux
+de la station la plus faible.
 
-## Configuration
+> **Cette intégration n'a jamais été testée avec une vraie radio.** Cette
+> première version a été portée depuis python-airos, la bibliothèque
+> qu'utilise Home Assistant, et testée seulement contre une fausse radio.
+> Dites sur le forum Gladys ce qui marche et ce qui ne marche pas, avec le
+> modèle et la version d'airOS.
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+Intégration non officielle, sans lien avec Ubiquiti.
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+## Avant de commencer
 
-## Actions
+1. La radio doit être sous **airOS 8** (affiché dans son interface web).
+   airOS 6 et antérieurs ne sont pas pris en charge.
+2. Gladys a besoin d'un compte de l'interface web (`ubnt` par défaut). Son
+   mot de passe est gardé par Gladys dans sa base, jamais réaffiché, et
+   envoyé seulement à la radio.
+3. Ajoutez une intégration par radio (les deux bouts d'un lien si vous voulez
+   les deux).
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+## Réglages
 
-## Scènes
+- **Adresse de la radio** : son adresse IP ou son nom d'hôte, avec `:port`
+  si son interface n'est pas sur 443. Le HTTP simple est refusé (airOS 8
+  sert du HTTPS).
+- **Nom d'utilisateur**, **Mot de passe**.
+- **Empreinte du certificat** (facultatif) : voir plus bas.
+- **Rafraîchissement** : 30 s, 1 min (par défaut), 2 ou 5 min. Jamais plus
+  souvent, quoi qui le demande (bouton de test, enregistrement du
+  formulaire, redémarrage de Gladys ou du conteneur : l'heure du dernier
+  essai est gardée).
+- **Autoriser le redémarrage de la radio** : désactivé par défaut.
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+## Le certificat HTTPS
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+La radio a un certificat auto-signé, qu'aucune autorité ne peut garantir.
+Gladys le vérifie par son empreinte SHA-256, juste après la négociation TLS et
+**avant** d'envoyer le mot de passe :
 
-## Tableau de bord
+- champ vide, à la première connexion : Gladys écrit le certificat rencontré
+  dans son stockage, **puis** envoie le mot de passe. Si son stockage ne peut
+  être ni lu ni écrit, rien n'est appris et rien n'est envoyé : saisissez
+  l'empreinte (l'état affiche celle rencontrée) ;
+- ensuite, un autre certificat arrête tout (rien n'est envoyé) et l'état
+  affiche son empreinte. Réenregistrer le formulaire ne change rien. Si vous
+  avez remplacé ou réinitialisé la radio, vérifiez cette empreinte dans
+  votre navigateur (cadenas, certificat, SHA-256) et saisissez-la dans
+  **Empreinte du certificat** : elle devient celle de confiance. Vider le
+  champ plus tard ne fait pas réapprendre de certificat.
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+## Le redémarrage
 
-## Dépannage
+Le bouton **Redémarrer la radio** est un bouton, jamais un interrupteur : un
+« tout éteindre » d'un assistant vocal ou d'une scène ne l'atteint jamais. Un
+appui est refusé, rien n'est envoyé, dans ces cas :
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **Autoriser le redémarrage de la radio** est désactivé (revérifié juste
+  avant l'écriture de la requête) ;
+- la radio n'est pas connectée, Gladys est dans une pause demandée par la
+  radio (HTTP 429 ou 5xx), l'identifiant ou le certificat a été refusé ;
+- un redémarrage a été envoyé il y a moins de 10 minutes (gardé au
+  redémarrage) ;
+- la radio ne répond pas à la lecture faite juste avant en 2,5 s, ou une
+  autre radio répond (autre MAC), ou sa MAC est illisible ;
+- la requête n'a pas pu être écrite dans les 3,5 s qui suivent l'appui.
+
+Quand la requête a été écrite mais que la radio n'a pas répondu, Gladys dit
+« envoyé, sans réponse » : la radio redémarre peut-être. Le lien tombe 1 à 2
+minutes ; l'état dit alors que la radio redémarre.
+
+## Erreurs
+
+- **Identifiants refusés** : plus rien n'est envoyé tant que le nom
+  d'utilisateur ou le mot de passe ne change pas ; le bouton **Tester la
+  connexion** essaie une fois de plus.
+- **HTTP 429 ou 5xx** : une pause de toutes les requêtes (1 min à 6 h),
+  gardée au redémarrage.
+- **Pas de réponse** : nouvel essai après l'intervalle de rafraîchissement,
+  puis 2, 4… jusqu'à 30 minutes.
+- **Une autre radio** à l'adresse (autre MAC) : rien n'est publié ;
+  enregistrez le formulaire pour la prendre comme la nouvelle.
+
+Ni le mot de passe, ni la session, ni les adresses MAC ou IP des stations ne
+sont journalisés, publiés ou stockés.
+
+## Pas (encore) fait
+
+Un appareil par station d'un point d'accès, la déconnexion d'une station, la
+mise à jour du firmware, airOS 6, l'AirCube et les appareils UniFi : dites-le
+sur le forum si vous en avez besoin.
