@@ -3,7 +3,7 @@
 // real local HTTPS server playing the radio (self-signed certificate, pinned
 // at the first contact): the readings really start, at 0, the interval and
 // twice the interval, with a bounded number of timers. The time is sped up
-// 50 times (30 s of the interval are 600 ms) but it is the real clock: it
+// 20 times (30 s of the interval are 1.5 s) but it is the real clock: it
 // moves between any two reads of it. The pace is measured where it is
 // decided (a spy on AirosClient#status, the start of a reading), never on
 // the connections the server sees (a login, a cold TLS start shift them).
@@ -19,7 +19,7 @@ import { memoryStore } from '../src/store.js';
 import { COOKIE, CSRF, PASSWORD, USERNAME, status } from './fixtures/airos.js';
 import { selfSigned } from './helpers/selfSigned.js';
 
-const SPEED = 50;
+const SPEED = 20;
 const INTERVAL = 30_000;
 
 test('real clock: readings at 0, the interval and twice the interval; timers bounded', async () => {

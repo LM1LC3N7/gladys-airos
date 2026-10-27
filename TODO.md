@@ -24,7 +24,7 @@ up to date at the end of every milestone.
       kept in /data; refused login, changed certificate, pause 429/5xx kept
       in /data; identity by a salted hash of the MAC. Tested with unit tests
       against the SDK's fake Gladys, a fake radio in memory, a real TLS
-      server on loopback, a real-clock test (×100). **Never tested with a
+      server on loopback, a real-clock test (×20). **Never tested with a
       real radio.**
 - [ ] **Milestone 2 — real radio** (a tester with an airOS 8 radio): record
       real answers as fixtures (identifiers anonymized), fix what differs.
@@ -59,9 +59,11 @@ up to date at the end of every milestone.
 - **Version 0.1.0 set by hand** (package.json, package-lock.json, manifest,
   `docker_image` tag) before the first release; the first release patch gives
   0.1.1. Versions belong to the Release workflow from then on.
-- **SDK `^0.15.0`**: the template asks `^0.16.0`, not published on npm on
-  2026-10-26 (`npm view` gives 0.15.0). Migrate when it is (CHANGELOG 0.16.0:
-  ai / tts / music types, nothing breaking).
+- **SDK `^0.16.0`** (2026-10-27, migration wave 2): 0.16.0 is on npm since
+  2026-10-25 (a stale npm cache said otherwise); it adds the ai, tts and music
+  types; no effect here (`should_poll` explicit, `poll_frequency` unused).
+  `keywords`, `countries` and `gladys_version >= 5.3.0` wait until Gladys 5.3
+  is widespread.
 - **Read only by default.** The reboot is the only command: a `button`/`push`
   feature, never a switch, refused unless `allow_reboot` is on (default off),
   checked again in `beforeSend`, right before the request is written. The
