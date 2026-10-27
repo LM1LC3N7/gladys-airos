@@ -1,6 +1,6 @@
 {
   "name": "gladys-airos",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Gladys Assistant external integration for Ubiquiti airMAX radios (airOS 8) through the local JSON API of their web interface: signal, rates, capacity, stations, link, reboot. Unofficial, not affiliated with Ubiquiti.",
   "type": "module",
