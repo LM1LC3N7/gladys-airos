@@ -10,6 +10,10 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Test helper: certificate serial numbers are always valid DER (a test failed about once in 100 runs).
+
 ## [0.1.2] - 2026-10-27
 
 ### Changed
